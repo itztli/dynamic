@@ -1,5 +1,7 @@
-<h1>Running</h1>
+<h1>Dynamic Evaluator</h1>
 
+<p>Dynamic evaluator is a software to parse throught command line mathematical expressions.</p>
+<p>This code is used as example in the class of Numerical Modeling/ENES Morelia/UNAM</p>
 <p>Change permissions to execute:</p>
 <p>chmod u+x dynamic.py</p>
 
