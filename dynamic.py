@@ -8,6 +8,8 @@ import numpy as np
 import pylab
 import sys
 import random as rn
+from scipy.optimize import curve_fit
+
 
 #./dynamic -f formulae.dat
 # USAGE
@@ -83,6 +85,8 @@ def plot_histo(fig_histo,ax_histo,f,g,bind):
 
 def plot_observations(fig,ax,obs_z,obs_d,obs_d_err):
     ax.errorbar(obs_z, obs_d, yerr=obs_d_err, fmt='o')
+
+
     
 #formulae='x^2+1.0'
 #def f(x):
@@ -98,6 +102,9 @@ equation_flag = False
 dynamic_flag=False
 histo_flag=False
 obs_flag=False
+noise_flag=False
+lvm_flag=False
+
 obs_filename=''
 bind=1
 formulae_str = 'x'
@@ -111,6 +118,7 @@ noise=0.0
 obs_z=[]
 obs_d=[]
 obs_d_err=[]
+X0=[]
 
 
 #argv[Z++]
@@ -186,6 +194,12 @@ for i in range(n):
         i+=1
         obs_filename=sys.argv[i]
 
+    #levenberg-marquardt
+    if  '-lvm' in sys.argv[i]:
+        lvm_flag=True
+        
+
+        
 if file_flag:
     with open(filename) as f:
         formulae=f.readlines()
@@ -213,16 +227,20 @@ if obs_flag:
             if line[0] != '#':
                 z,d,d_err = line.split()
                 obs_z.append(float(z))
+                X0.append(float(z))
                 obs_d.append(float(d))
                 obs_d_err.append(float(d_err))
-
+        X0 = np.array(X0)
+        obs_d = np.array(obs_d)
         #formulae_str=formulae[0]
         #print('Using archive mode  with '+formulae_str)
     
 A = np.arange(a0,a1,da)
 B = np.arange(b0,b1,db)
 N = np.arange(n0,n1,dn)    
-X0= np.arange(x0,x1,dx)    
+if not obs_flag:
+    X0= np.arange(x0,x1,dx)    
+
 print(A)
 print(B)
 print(N)
@@ -246,18 +264,44 @@ for a in A:
                     caption = "a="+str(a)+" b="+str(b)+" n="+str(n)+" x0="+str(x0)+" i="+str(itera)
                     plotting(fig,ax,time,y1,formulae_str,filename,caption)
             else:
-                time, g = function_system(formulae_str,a,b,n,X0,noise_flag,noise)
+                if noise_flag:
+                    time, g = function_system(formulae_str,a,b,n,X0,noise_flag,noise)
                 time, f = function_system(formulae_str,a,b,n,X0,False,0)
 
                 filename=formulae_str+"_a"+str(a)+"_b"+str(b)+"_n"+str(itera)+"_x0"+str(x0)+"_i"+str(n)+".png"
                 caption = "a="+str(a)+" b="+str(b)+" n="+str(n)+" x0="+str(x0)+" i="+str(itera)
                 plotting(fig,ax,time,f,formulae_str,filename,caption)
-                plotting(fig,ax,time,g,formulae_str,filename,caption)
+                if noise_flag:
+                    plotting(fig,ax,time,g,formulae_str,filename,caption)
                 if obs_flag:
                     plot_observations(fig,ax,obs_z,obs_d,obs_d_err)
+
+                if lvm_flag:
+                    xdata=X0
+                    ydata=obs_d
+
+                    x,a,b,n = symbols("x a b n")
+                    #print(a0,b0,n0,x0)
+                    y = sympify(formulae_str)
+                    #y = y.subs(a,a0)
+                    #y = y.subs(b,b0)
+                    #y = y.subs(n,n0)
+                    #print(y)
+                    func=lambdify([x,a,b,n],y,"numpy")
+                    #y1 = f(x0)
+                    #print(y1)                        
+                    popt, pcov = curve_fit(func, xdata, ydata)
+                    print(popt)
+                    plotting(fig,ax,xdata, func(xdata, *popt),formulae_str,filename,caption)
                 if histo_flag:
-                    plot_histo(fig_histo,ax_histo,f,g,bind)
-                
+                    if noise_flag:
+                        plot_histo(fig_histo,ax_histo,f,g,bind)
+                    if lvm_flag:
+                        plot_histo(fig_histo,ax_histo,func(xdata, *popt),obs_d,bind)
+                    else:
+                        plot_histo(fig_histo,ax_histo,f,obs_d,bind)
+
+                        
 #pylab.legend(loc='upper left')
 plt.show()
 fig.savefig(filename)
